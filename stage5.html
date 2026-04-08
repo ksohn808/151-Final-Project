@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Stage 5: Accel + Geo Combined</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>* { margin: 0; padding: 0; } body { overflow: hidden; background: #111; }</style>
+</head>
+<body><script>
+// ============================================================
+// STAGE 5 — COMBINED: ACCELEROMETER + GEOLOCATION
+// ============================================================
+// This brings everything together:
+//   • Geolocation positions you in the world (x/y ground)
+//   • Accelerometer tilts the camera/view angle
+//   • GPS trail draws a path of where you've been
+//   • Each waypoint = a 3D pillar, height = walking speed
+//
+// Starting point for your final — what other data could
+// you layer in? (time, sound level, touch, color…)
+// ============================================================
+
+// ---- Accel ----
+let accelX = 0, accelY = 0;
+let smoothAX = 0, smoothAY = 0;
+
+// ---- Geo ----
+let startLat = null, startLon = null;
+let currentLat = 0, currentLon = 0;
+let geoAccuracy = 0;
+let trail = []; // { x, y, time, speed }
+let lastTime = 0;
+
+let info, btn;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight, WEBGL);
+
+  btn = createButton('Tap to Enable Motion + Location');
+  btn.style('font-size', '18px');
+  btn.style('padding', '20px 30px');
+  btn.style('position', 'fixed');
+  btn.style('top', '50%');
+  btn.style('left', '50%');
+  btn.style('transform', 'translate(-50%,-50%)');
+  btn.style('z-index', '1000');
+  btn.mousePressed(requestAll);
+
+  info = createDiv('Waiting…');
+  info.style('position', 'fixed');
+  info.style('bottom', '10px');
+  info.style('left', '10px');
+  info.style('color', 'white');
+  info.style('font-family', 'monospace');
+  info.style('font-size', '12px');
+  info.style('background', 'rgba(0,0,0,0.7)');
+  info.style('padding', '8px');
+  info.style('border-radius', '6px');
+  info.style('z-index', '1000');
+}
+
+async function requestAll() {
+  if (typeof DeviceMotionEvent !== 'undefined' &&
+      typeof DeviceMotionEvent.requestPermission === 'function') {
+    let perm = await DeviceMotionEvent.requestPermission();
+    if (perm !== 'granted') return;
+  }
+  startMotion();
+  startGeo();
+  btn.hide();
+}
+
+function startMotion() {
+  window.addEventListener('devicemotion', (e) => {
+    let a = e.accelerationIncludingGravity;
+    if (a) {
+      accelX = a.x || 0;
+      accelY = a.y || 0;
+    }
+  });
+}
+
+function startGeo() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.watchPosition(
+    (pos) => {
+      currentLat = pos.coords.latitude;
+      currentLon = pos.coords.longitude;
+      geoAccuracy = pos.coords.accuracy;
+
+      if (startLat === null) {
+        startLat = currentLat;
+        startLon = currentLon;
+        lastTime = Date.now();
+      }
+
+      let dLat = (currentLat - startLat) * 111320;
+      let dLon = (currentLon - startLon) * 111320 * cos(radians(startLat));
+
+      // Speed = distance since last point / time
+      let now = Date.now();
+      let speed = 0;
+      if (trail.length > 0) {
+        let prev = trail[trail.length - 1];
+        let dist = sqrt((dLon - prev.x) ** 2 + (dLat - prev.y) ** 2);
+        let dt = (now - lastTime) / 1000;
+        speed = dt > 0 ? dist / dt : 0;
+      }
+      lastTime = now;
+
+      trail.push({ x: dLon, y: -dLat, time: now, speed });
+      if (trail.length > 1000) trail.shift();
+    },
+    (err) => console.log('GPS error', err),
+    { enableHighAccuracy: true, maximumAge: 0 }
+  );
+}
+
+function draw() {
+  background(15, 15, 25);
+
+  // ---------- CAMERA TILT VIA ACCELEROMETER ----------
+  smoothAX = lerp(smoothAX, accelX, 0.08);
+  smoothAY = lerp(smoothAY, accelY, 0.08);
+  let camTiltX = map(smoothAY, -10, 10, -0.6, 0.6);
+  let camTiltY = map(smoothAX, -10, 10, -0.6, 0.6);
+
+  rotateX(0.5 + camTiltX);
+  rotateZ(camTiltY);
+
+  ambientLight(50);
+  pointLight(255, 200, 150, 0, 0, 300);
+  directionalLight(100, 150, 255, -0.5, 0.5, -1);
+
+  let s = 20; // scale: 1 meter = 20 pixels
+
+  // ---------- GROUND GRID ----------
+  push();
+    stroke(40, 40, 60);
+    noFill();
+    for (let i = -15; i <= 15; i++) {
+      line(i * 50, -750, 0, i * 50, 750, 0);
+      line(-750, i * 50, 0, 750, i * 50, 0);
+    }
+  pop();
+
+  // ---------- TRAIL LINE ----------
+  if (trail.length > 1) {
+    push();
+      noFill();
+      stroke(80, 160, 255, 150);
+      strokeWeight(2);
+      beginShape();
+      for (let pt of trail) vertex(pt.x * s, pt.y * s, 1);
+      endShape();
+    pop();
+  }
+
+  // ---------- WAYPOINT PILLARS ----------
+  // Height = speed. Standing still = flat, walking = tall.
+  for (let i = 0; i < trail.length; i++) {
+    let pt = trail[i];
+    let h = map(pt.speed, 0, 3, 5, 150, true);
+
+    push();
+      translate(pt.x * s, pt.y * s, h / 2);
+      // Color shifts: early = blue, recent = orange
+      let t = map(i, 0, trail.length, 0, 1);
+      ambientMaterial(lerp(60, 255, t), 120, lerp(255, 50, t));
+      noStroke();
+      box(8, 8, h);
+    pop();
+  }
+
+  // ---------- CURRENT POSITION MARKER ----------
+  if (trail.length > 0) {
+    let last = trail[trail.length - 1];
+    push();
+      translate(last.x * s, last.y * s, 60);
+      rotateX(frameCount * 0.03);
+      rotateY(frameCount * 0.04);
+      emissiveMaterial(255, 100, 80);
+      torus(18, 6);
+    pop();
+  }
+
+  if (startLat !== null) {
+    info.html(
+      `lat:${currentLat.toFixed(5)} lon:${currentLon.toFixed(5)} ±${geoAccuracy.toFixed(0)}m | ` +
+      `tilt x:${smoothAX.toFixed(1)} y:${smoothAY.toFixed(1)} | pts:${trail.length}`
+    );
+  }
+}
+
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script></body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ART 151 — Motion + Geo Workshop</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: monospace;
+      background: #111;
+      color: #eee;
+      padding: 30px 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 22px; margin-bottom: 6px; }
+    .sub { color: #888; font-size: 14px; margin-bottom: 30px; }
+    a {
+      display: block;
+      padding: 18px 16px;
+      margin-bottom: 12px;
+      background: #1a1a2e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #7ec8e3;
+      text-decoration: none;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+    a:active { background: #222244; }
+    a span { display: block; color: #888; font-size: 13px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h1>ART 151 Final Workshop</h1>
+  <p class="sub">Accelerometer + Geolocation + 3D</p>
+
+  <a href="stage1.html">
+    Stage 1: Basic 3D
+    <span>WEBGL, lighting, rotation, normalMaterial</span>
+  </a>
+  <a href="stage2.html">
+    Stage 2: Accelerometer → Rotation
+    <span>DeviceMotionEvent, iOS permission, lerp smoothing</span>
+  </a>
+  <a href="stage3.html">
+    Stage 3: Accelerometer → Position
+    <span>Physics, velocity/friction, push/pop, multiple shapes</span>
+  </a>
+  <a href="stage4.html">
+    Stage 4: Geolocation
+    <span>watchPosition, lat/lon → meters, GPS trail</span>
+  </a>
+  <a href="stage5.html">
+    Stage 5: Combined
+    <span>Tilt + GPS + speed → 3D landscape</span>
+  </a>
+  <a href="debug.html">
+    🛠 Debug: Motion Diagnostic
+    <span>Test if your device is sending accelerometer data</span>
+  </a>
+</body>
+</html>

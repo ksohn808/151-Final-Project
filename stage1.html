@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Stage 1: Basic 3D</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>* { margin: 0; padding: 0; } body { overflow: hidden; background: #111; }</style>
+</head>
+<body><script>
+// ============================================================
+// STAGE 1 — BASIC 3D
+// ============================================================
+// Key concept: When you pass WEBGL as the third argument to
+// createCanvas(), p5 gives you a 3D drawing context.
+// The origin (0,0,0) is now the CENTER of the canvas,
+// not the top-left corner like in 2D mode.
+// ============================================================
+
+function setup() {
+  createCanvas(windowWidth, windowHeight, WEBGL);
+}
+
+function draw() {
+  background(255);
+
+  // ---------- LIGHTING ----------
+  // Without lights, 3D shapes look flat and featureless.
+  // ambientLight gives a soft overall glow.
+  // directionalLight shines from a specific direction.
+  ambientLight(60);
+  directionalLight(255, 255, 255, 0.5, 0.5, -1);
+
+  // ---------- ROTATION ----------
+  // rotateX/Y/Z spin the entire coordinate system.
+  // Everything drawn AFTER a rotate call is affected.
+  // frameCount keeps increasing → animation.
+  rotateX(frameCount * 0.01);
+  rotateY(frameCount * 0.013);
+
+  // ---------- MATERIAL ----------
+  // normalMaterial() colors each face based on its direction.
+  // Great for debugging — you can see which face is which.
+  normalMaterial();
+
+  // ---------- DRAWING A BOX ----------
+  // box(width, height, depth) — all in pixels
+  box(250);
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
+</script></body>
+</html>

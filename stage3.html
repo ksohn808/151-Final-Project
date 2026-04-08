@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Stage 3: Accel → Position</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>* { margin: 0; padding: 0; } body { overflow: hidden; background: #111; }</style>
+</head>
+<body><script>
+// ============================================================
+// STAGE 3 — ACCELEROMETER → POSITION + MULTIPLE SHAPES
+// ============================================================
+// NEW in this stage:
+//   • Using accel data to move (translate) rather than rotate
+//   • push()/pop() to isolate transformations per shape
+//   • Multiple primitives responding differently to same data
+//   • Simple physics: tilt = force → velocity accumulates
+// ============================================================
+
+let accelX = 0, accelY = 0, accelZ = 0;
+
+// Instead of mapping accel directly to position, we treat
+// tilt as a FORCE that changes velocity. Much more natural.
+let posX = 0, posY = 0;
+let velX = 0, velY = 0;
+
+let info, btn;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight, WEBGL);
+
+  btn = createButton('Tap to Enable Motion');
+  btn.style('font-size', '20px');
+  btn.style('padding', '20px 30px');
+  btn.style('position', 'fixed');
+  btn.style('top', '50%');
+  btn.style('left', '50%');
+  btn.style('transform', 'translate(-50%,-50%)');
+  btn.style('z-index', '1000');
+  btn.mousePressed(requestMotion);
+
+  info = createDiv('');
+  info.style('position', 'fixed');
+  info.style('bottom', '10px');
+  info.style('left', '10px');
+  info.style('color', 'white');
+  info.style('font-family', 'monospace');
+  info.style('font-size', '13px');
+  info.style('background', 'rgba(0,0,0,0.6)');
+  info.style('padding', '8px');
+  info.style('border-radius', '6px');
+  info.style('z-index', '1000');
+}
+
+async function requestMotion() {
+  if (typeof DeviceMotionEvent !== 'undefined' &&
+      typeof DeviceMotionEvent.requestPermission === 'function') {
+    let perm = await DeviceMotionEvent.requestPermission();
+    if (perm === 'granted') startListening();
+  } else {
+    startListening();
+  }
+  btn.hide();
+}
+
+function startListening() {
+  window.addEventListener('devicemotion', (e) => {
+    let a = e.accelerationIncludingGravity;
+    if (a) {
+      accelX = a.x || 0;
+      accelY = a.y || 0;
+      accelZ = a.z || 0;
+    }
+  });
+}
+
+function draw() {
+  background(20);
+  ambientLight(80);
+  directionalLight(255, 255, 255, 0.5, 0.5, -1);
+
+  // ---------- SIMPLE PHYSICS ----------
+  // Tilt → force → velocity → position
+  // 0.5 controls sensitivity, 0.98 is friction/damping
+  velX += accelX * 0.5;
+  velY += -accelY * 0.5; // negative: screen Y is flipped
+  velX *= 0.98;
+  velY *= 0.98;
+  posX += velX;
+  posY += velY;
+
+  // ---------- BOUNDARY BOUNCE ----------
+  let bound = min(width, height) * 0.4;
+  if (posX > bound)  { posX = bound;  velX *= -0.5; }
+  if (posX < -bound) { posX = -bound; velX *= -0.5; }
+  if (posY > bound)  { posY = bound;  velY *= -0.5; }
+  if (posY < -bound) { posY = -bound; velY *= -0.5; }
+
+  // ---------- SHAPE 1: ROLLING SPHERE ----------
+  // push/pop isolates this transform from others
+  push();
+    translate(posX, posY, 0);
+    rotateX(posY * 0.02);
+    rotateY(posX * 0.02);
+    normalMaterial();
+    sphere(60);
+  pop();
+
+  // ---------- SHAPE 2: STATIONARY TORUS ----------
+  // Stays at center, rotates with tilt (Stage 2 technique)
+  push();
+    rotateX(map(accelY, -10, 10, -HALF_PI, HALF_PI));
+    rotateY(map(accelX, -10, 10, -HALF_PI, HALF_PI));
+    ambientMaterial(100, 200, 255);
+    torus(120, 20);
+  pop();
+
+  // ---------- SHAPE 3: TRAILING BOXES ----------
+  // Follow the sphere with decreasing strength → echo effect
+  for (let i = 1; i <= 4; i++) {
+    push();
+      let factor = 1 - i * 0.2;
+      translate(posX * factor, posY * factor, -i * 40);
+      rotateX(frameCount * 0.02 * i);
+      rotateY(frameCount * 0.03 * i);
+      ambientMaterial(255, 100 + i * 30, 50);
+      box(30 - i * 4);
+    pop();
+  }
+
+  info.html(`accel x:${accelX.toFixed(1)} y:${accelY.toFixed(1)} | pos x:${posX.toFixed(0)} y:${posY.toFixed(0)}`);
+}
+
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+</script></body>
+</html>

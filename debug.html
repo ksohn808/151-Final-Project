@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Debug: Motion Diagnostic</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>* { margin: 0; padding: 0; } body { overflow: hidden; background: #111; }</style>
+</head>
+<body><script>
+let eventCount = 0;
+let lastEvent = 'none yet';
+let permLog = 'Tap the button\n';
+let info, btn;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  background(30);
+
+  btn = createButton('Request Motion');
+  btn.style('font-size', '24px');
+  btn.style('padding', '20px');
+  btn.style('position', 'fixed');
+  btn.style('top', '20px');
+  btn.style('left', '20px');
+  btn.style('z-index', '1000');
+  btn.mousePressed(requestMotion);
+
+  info = createDiv(permLog);
+  info.style('position', 'fixed');
+  info.style('top', '100px');
+  info.style('left', '20px');
+  info.style('color', 'lime');
+  info.style('font-family', 'monospace');
+  info.style('font-size', '16px');
+  info.style('white-space', 'pre');
+  info.style('background', 'black');
+  info.style('padding', '15px');
+  info.style('border', '2px solid lime');
+  info.style('z-index', '1000');
+  info.style('max-width', '85vw');
+}
+
+async function requestMotion() {
+  permLog = 'Button pressed!\n';
+  permLog += 'DeviceMotionEvent: ' + (typeof DeviceMotionEvent) + '\n';
+  permLog += 'requestPermission: ' +
+    (typeof DeviceMotionEvent.requestPermission) + '\n';
+
+  if (typeof DeviceMotionEvent.requestPermission === 'function') {
+    try {
+      let perm = await DeviceMotionEvent.requestPermission();
+      permLog += 'Permission: ' + perm + '\n';
+    } catch (e) {
+      permLog += 'Error: ' + e + '\n';
+    }
+  }
+
+  window.addEventListener('devicemotion', (e) => {
+    eventCount++;
+    let a = e.accelerationIncludingGravity;
+    lastEvent = a
+      ? 'x:' + (a.x?.toFixed(2)) +
+        ' y:' + (a.y?.toFixed(2)) +
+        ' z:' + (a.z?.toFixed(2))
+      : 'accelIncludingGravity is NULL';
+  });
+
+  permLog += 'Listener attached.\n';
+}
+
+function draw() {
+  background(30);
+  if (info) {
+    info.html(
+      permLog +
+      '\nEvents: ' + eventCount +
+      '\nData: ' + lastEvent
+    );
+  }
+}
+</script></body>
+</html>
