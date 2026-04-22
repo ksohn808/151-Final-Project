@@ -153,10 +153,15 @@ function showPage2() {
   });
 }
 
+function showAnalysis() {
+
+}
+
+// Loading Result Text
 function runAnalysis(data) {
   const output = document.getElementById("analysis-output");
 
-  output.innerHTML = `
+  main.innerHTML = `
     <div class="analysis-box">
       <h2 id="analysis-text">Analyzing responses</h2>
       <p id="analysis-sub"></p>
@@ -191,7 +196,7 @@ function runAnalysis(data) {
   setTimeout(() => {
     clearInterval(dotInterval);
 
-    output.innerHTML = `
+    main.innerHTML = `
       <div class="analysis-box">
         <h2>${data.name}'s Result</h2>
         <h1 class="result-color">RED</h1>
@@ -226,21 +231,6 @@ function showPage3() {
       <!-- PERSONALIZED TEXT -->
       <section id="cult-message">
         <h2>Welcome, ${quizData.name}.</h2>
-        <p>
-          Your responses have been received and interpreted.
-        </p>
-        <p>
-          You came to us from <strong>${quizData.city}</strong>.
-        </p>
-        <p>
-          You described yourself as <strong>${quizData.selfWord}</strong>.
-        </p>
-        <p>
-          Your fear has been logged as <strong>${quizData.fear}</strong>.
-        </p>
-        <p>
-          Your desire has been logged as <strong>${quizData.desire}</strong>.
-        </p>
         <p class="cult-line">
           Red has accepted you. Now you must prove yourself.
         </p>
@@ -254,7 +244,6 @@ function showPage3() {
         </p>
 
         <div id="game-box">
-          <p>[ Game ]</p>
         </div>
 
         <button id="start-game-btn">Start Trial</button>
