@@ -9,5 +9,4 @@ function draw() {
   orbitControl();
   fill("blue");
   box(100);
-  
 }
