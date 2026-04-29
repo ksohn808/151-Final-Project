@@ -95,12 +95,12 @@ function showPage2() {
           </p>
 
           <p>
-            <label for="fear">Biggest fear</label><br>
+            <label for="fear">Biggest fear (one word)</label><br>
             <input type="text" id="fear" name="fear" maxlength="20" required>
           </p>
 
           <p>
-            <label for="desire">Greatest desire</label><br>
+            <label for="desire">Greatest desire (one word)</label><br>
             <input type="text" id="desire" name="desire" maxlength="20" required>
           </p>
 
@@ -140,9 +140,9 @@ function showPage2() {
     const quizData = {
       name: document.getElementById("name").value,
       city: document.getElementById("city").value,
-      selfWord: document.getElementById("selfWord").value,
-      fear: document.getElementById("fear").value,
-      desire: document.getElementById("desire").value,
+      selfWord: document.getElementById("selfWord").value.toLowerCase(),
+      fear: document.getElementById("fear").value.toLowerCase(),
+      desire: document.getElementById("desire").value.toLowerCase(),
       consentAnalyze: document.getElementById("consentAnalyze").checked,
       consentPersonal: document.getElementById("consentPersonal").checked
     };
@@ -151,10 +151,6 @@ function showPage2() {
 
     runAnalysis(quizData);
   });
-}
-
-function showAnalysis() {
-
 }
 
 // Loading Result Text
@@ -186,7 +182,7 @@ function runAnalysis(data) {
   }, 3400);
 
   setTimeout(() => {
-    sub.textContent = "Measuring color alignment...";
+    sub.textContent = "This isn't right...";
   }, 5200);
 
   setTimeout(() => {
@@ -201,6 +197,7 @@ function runAnalysis(data) {
         <h2>${data.name}'s Result</h2>
         <h1 class="result-color">RED</h1>
         <p>You are <strong>${data.selfWord}</strong></p>
+        <p>You live in <strong>${data.city}</strong></p>
         <p>You fear <strong>${data.fear}</strong></p>
         <p>You desire <strong>${data.desire}</strong></p>
         <p class="worthy-line">You are worthy.</p>
@@ -216,8 +213,6 @@ function runAnalysis(data) {
 
 function showPage3() {
   document.body.className = "page3";
-
-  const data = window.quizData;
 
   main.innerHTML = `
     <div id="page3">
@@ -253,8 +248,69 @@ function showPage3() {
   `;
 
   document.getElementById("start-game-btn").addEventListener("click", () => {
-    alert("Next step: launch the Page 4 minigame.");
+    window.startRedTrial();
   });
+}
+
+function showPage4() {
+    document.body.className = "page1";
+    
+  main.innerHTML = `
+    <div id="page1">
+
+      <!-- TOP BANNER -->
+      <header>
+        <h1>KOOL KATS!!!</h1>
+        <p>😎 The Coolest Cats on the Internet 😎</p>
+      </header>
+
+      <!-- INTRO -->
+      <section id="intro">
+        <h2>Welcome to KOOL KATS!!!</h2>
+        <p>The ultimate fan page for the coolest, smoothest, most stylish cats around.</p>
+        <p>These cats don’t just nap — they chill. 😎</p>
+      </section>
+
+      <!-- CAT FACTS -->
+      <section id="facts">
+        <h2>Cool Cat Facts</h2>
+        <ul>
+          <li>Cats wearing sunglasses are scientifically cooler.</li>
+          <li>Some cats are born with natural swagger.</li>
+          <li>Cool cats only hang out with other cool cats.</li>
+        </ul>
+      </section>
+
+      <!-- CAT GALLERY -->
+      <section id="gallery">
+        <h2>Cool Cat Gallery</h2>
+
+        <!-- IMAGES -->
+        <div class="cat-gallery">
+          <img src="assets/cool_cat.jpg">
+          <img src="assets/smoking_cat.jpg">
+          <img src="assets/us_cats.jpg">
+          <img src="assets/paris_cat.jpg">
+          <img src="assets/stylish_cat.jpg">
+          <img src="assets/yellow_sunglasses.jpg">
+          <!-- https://animalcare.my/2014/05/04/cool-cat-scooter-hip-spectacles-no-testicles-gets-the-message-across/ -->
+          <!-- https://www.instagram.com/p/DTzSy5AjZOi/?img_index=3 -->
+          <!-- https://www.reddit.com/r/cats/comments/1l2kugo/ive_got_some_pretty_cool_cats/ -->
+          <!-- https://www.pinterest.com/pin/4151824642015550/ -->
+          <!-- https://www.facebook.com/groups/637834490157380/posts/1640490179891801/ -->
+          <!-- https://www.facebook.com/ColeandMarmalade/posts/theres-no-denying-that-cole-was-one-cool-cat-nationalsunglassesday-coolcat-flash/1345104573641877/ -->
+        </div>
+      </section>
+
+      <!-- AD IMAGE -->
+      <footer id="ad-bar">
+        <a href="#" id="quiz-link">
+          <img src="assets/final_ad.png" id="ad-image">
+        </a>
+      </footer>
+
+    </div>
+  `;
 }
 
 // Load first page

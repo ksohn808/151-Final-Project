@@ -1,410 +1,674 @@
-// ---------- Canvas / layout ----------
-const CANVAS_W = 1000;
-const CANVAS_H = 650;
-const NARRATION_HEIGHT = 110;
-const END_ZONE_W = 60;
+// ===============================
+// GAME STATE
+// ===============================
+let gameState = "hidden"; 
+let currentNarrative = "";
+let bottomVoice = "";
+let gameCanvas;
+let stage3TrapTriggered = false;
+let currentStage = 1;
+let finalTriggered = false;
 
-// ---------- Movement / gameplay ----------
-const PLAYER_SPEED = 4;
-const TOTAL_HEARTS_GOAL = 7;
-
-// ---------- Audio ----------
-let song;
-let osc;
-let env;
-
-// ---------- Main game objects ----------
+// ===============================
+// PLAYER + OBJECTS
+// ===============================
 let player;
 let barriers = [];
-let particles = [];
-let walls = [];
 let hearts = [];
-let unlockedColors = [];
+let walls = [];
+let particles = [];
 
-// ---------- Game state ----------
-let bgHue = 220;
 let heartsCollected = 0;
-let currentLevel = 0;
-let gameState = "intro"; // intro, play
 
-// ---------- Narrative text ----------
-let currentNarrative = "You are Red.";
+let osc;
+let env;
+let song;
+let finalSong;
 
-let blockedOnce = false;
+// ===============================
+// CONSTANTS
+// ===============================
+const PLAYER_SPEED = 4;
+const END_ZONE_W = 60;
 
-// =====================================================
-// MAIN SKETCH
-// p5 lifecycle, input handling, update loop, and gameplay flow
-// =====================================================
+// ===============================
+// START GAME (called from app.js)
+// ===============================
+function startRedTrial() {
+  // Make sure the canvas is visible/attached
+  gameCanvas.parent("game-box");
+  gameCanvas.show();
 
-// ---------- Load assets ----------
-function preload() {
-  song = loadSound("assets/loop.wav");
+  document.activeElement.blur();
+
+  // Stop music from any previous run
+  if (song && song.isPlaying()) {
+    song.stop();
+  }
+
+  // Reset all game state
+  gameState = "intro";
+  currentNarrative = "";
+  bottomVoice = "";
+  currentStage = 1;
+  stage3TrapTriggered = false;
+  heartsCollected = 0;
+
+  player = null;
+  barriers = [];
+  hearts = [];
+  walls = [];
+  particles = [];
+
+  // Rebuild Stage 1 fresh
+  setupStage1();
+
+  // Load music once, but do not play until ENTER
+  if (!song) {
+    song = loadSound("assets/loop.wav", () => {
+      song.setVolume(0.15);
+    });
+  }
+
+  loop();
 }
 
-// ---------- Initial setup ----------
+function colorHue(color) {
+  if (color === "Red") return 0;
+  if (color === "Blue") return 220;
+  return 0;
+}
+
+// ===============================
+// SETUP
+// ===============================
 function setup() {
-  createCanvas(CANVAS_W, CANVAS_H);
+  gameCanvas = createCanvas(800, 600);
+  gameCanvas.hide();
+
   colorMode(HSB, 360, 100, 100, 100);
   rectMode(CORNER);
   noStroke();
   textFont("monospace");
 
-  setupAudio();
-  setupLevel1();
-}
-
-// ---------- Audio setup ----------
-function setupAudio() {
   env = new p5.Envelope();
-  env.setADSR(0.02, 0.2, 0.15, 0.4);
-  env.setRange(1, 0);
+  env.setADSR(0.01, 0.05, 0.1, 0.08);
+  env.setRange(0.1, 0);
 
   osc = new p5.Oscillator("square");
   osc.start();
-  osc.amp(env);
-  outputVolume(0.2);
+  osc.amp(0);
+
+  noLoop();
 }
 
-// ---------- Main draw loop ----------
+// ===============================
+// STAGE 1
+// ===============================
+function setupStage1() {
+  currentStage = 1;
+  heartsCollected = 0;
+  bottomVoice = "";
+
+  player = new Player(80, 400);
+
+  barriers = [
+    new Barrier(width / 2, 140, 40, 370, "Red")
+  ];
+
+  hearts = [
+    new Heart(150, 300, "Red")
+  ];
+  hearts[0].visible = false;
+
+  walls = [
+    new Wall(0, 120, width, 20),
+    new Wall(0, height - 100, width, 20)
+  ];
+
+  currentNarrative = "RED ORDER: Become one of us.";
+}
+
+// ===============================
+// STAGE 2
+// ===============================
+function setupStage2() {
+  currentStage = 2;
+  heartsCollected = 0;
+  bottomVoice = "";
+
+  player = new Player(80, 400);
+
+  barriers = [
+    new Barrier(width / 2, 140, 40, 160, "Red"),
+    new Barrier(width / 2, 300, 40, 200, "Blue")
+  ];
+
+  hearts = [
+    new Heart(200, 260, "Red"),
+    new Heart(200, 410, "Blue")
+  ];
+
+  walls = [
+    new Wall(0, 120, width, 20),
+    new Wall(100, height / 2, width, 20),
+    new Wall(0, height - 100, width, 20)
+  ];
+
+  currentNarrative = "RED ORDER: Remain Red. Reject all other colors.";
+}
+
+function setupStage3() {
+  currentStage = 3;
+  stage3TrapTriggered = true;
+  heartsCollected = 0;
+  bottomVoice = "";
+
+  player = new Player(130, 360);
+  player.color = "Red";
+
+  barriers = [
+    // This is the escape wall. It looks like part of the cell, but Blue can pass through.
+    new Barrier(360, 300, 35, 160, "Blue")
+  ];
+
+  hearts = [
+    new Heart(210, 380, "Blue")
+  ];
+
+  hearts[0].visible = false;
+
+  walls = [
+    // Cell boundaries
+    new Wall(80, 280, 320, 20),   // top
+    new Wall(80, 460, 320, 20),   // bottom
+    new Wall(80, 280, 20, 200),   // left
+
+    // Main level boundaries
+    new Wall(0, 120, width, 20),
+    new Wall(0, height - 100, width, 20)
+  ];
+
+  currentNarrative = "RED ORDER: Now stay here forever.";
+}
+
+function drawWalls() {
+  for (let wall of walls) {
+    wall.display();
+  }
+}
+
+function drawAtmosphere() {
+  background(230, 30, 12);
+
+  for (let i = 0; i < 4; i++) {
+    fill(220, 25, 35, 8);
+    ellipse(width / 2, height / 2, 300 + i * 120, 300 + i * 120);
+  }
+}
+
+// ===============================
+// DRAW LOOP
+// ===============================
 function draw() {
+  if (gameState === "hidden") return;
+
+  drawAtmosphere();
+
   if (gameState === "intro") {
-    drawIntroScreen();
+    drawIntro();
     return;
   }
 
-  if (gameState === "win") {
-    drawWinScreen();
+  if (gameState === "stageComplete1") {
+    drawComplete1();
     return;
   }
-  
-  // Level 1: reveal first heart after moving right
-  if (currentLevel === 1 && hearts.length > 0 && player.x > 465) {
-    hearts[0].visible = true;
+
+  if (gameState === "stageComplete2") {
+    drawComplete2();
+    return;
   }
 
-  drawAtmosphere(bass, treble);
+  if (gameState === "finalComplete") {
+    drawFinalComplete();
+    return;
+  }
 
+  // ===============================
+  // GAMEPLAY
+  // ===============================
   handleMovement();
-
   resolveWallCollisions();
 
   updateHearts();
   updateBarriers();
-  drawEndZone();
+
   drawWalls();
+  drawEndZone();
 
   player.display();
   updateParticles();
 
   checkEndZone();
-  drawBottomUI();
+  drawNarration();
+  drawBottomVoice();
 }
 
-// ---------- Movement from keyboard ----------
+function spawnParticles(x, y, hue) {
+  for (let i = 0; i < 6; i++) {
+    particles.push({
+      x,
+      y,
+      vx: random(-2, 2),
+      vy: random(-2, 2),
+      life: 30,
+      hue
+    });
+  }
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+
+    fill(p.hue, 80, 100, map(p.life, 0, 30, 0, 100));
+    ellipse(p.x, p.y, 8);
+
+    if (p.life <= 0) {
+      particles.splice(i, 1);
+    }
+  }
+}
+
+// ===============================
+// INTRO SCREEN
+// ===============================
+function drawIntro() {
+  fill(0, 80, 100);
+  textAlign(CENTER, CENTER);
+
+  textSize(30);
+  text("THE TRIAL OF RED", width / 2, height / 2 - 60);
+
+  textSize(16);
+  text("W A S D = Move", width / 2, height / 2);
+
+  textSize(14);
+  text("Press ENTER to begin.", width / 2, height / 2 + 60);
+}
+
+// ===============================
+// COMPLETE SCREEN
+// ===============================
+function drawComplete1() {
+  const q = window.quizData;
+
+  fill(0, 80, 100);
+  textAlign(CENTER, CENTER);
+
+  textSize(28);
+  text(`Good job, ${q.name}.`, width / 2, height / 2 - 40);
+
+  textSize(14);
+  text(`You truly are a ${q.selfWord} person.`, width / 2, height / 2 + 20);
+
+  textSize(14);
+  text("Press ENTER to continue.", width / 2, height / 2 + 95);
+}
+
+function drawComplete2() {
+  const q = window.quizData;
+
+  fill(0, 80, 100);
+  textAlign(CENTER, CENTER);
+
+  textSize(28);
+  text(`Good job, ${q.name}.`, width / 2, height / 2 - 40);
+
+  textSize(14);
+  text(`Keep it up and your desire for ${q.desire} will be fulfilled.`, width / 2, height / 2 + 20);
+
+  textSize(14);
+  text("Press ENTER to continue.", width / 2, height / 2 + 95);
+}
+
+function drawFinalComplete() {
+  const q = window.quizData;
+  const btn = document.getElementById("start-game-btn");
+
+  if (btn) btn.disabled = true;
+
+  // trigger only once
+  if (!finalTriggered) {
+    finalTriggered = true;
+
+    // play final music
+    if (!finalSong) {
+      finalSong = loadSound("assets/corrupted.mp3", () => {
+        finalSong.setVolume(0.5);
+        finalSong.loop();
+      });
+    } else {
+      finalSong.setVolume(0.5);
+      finalSong.loop();
+    }
+
+    // start glitch
+    document.body.classList.add("glitch-final");
+
+    // redirect after 8 seconds
+    setTimeout(() => {
+      document.body.classList.remove("glitch-final");
+      if (typeof showPage4 === "function") {
+        finalSong.stop();
+        showPage4();
+      }
+    }, 15000);
+  }
+
+  fill(0, 80, 100);
+  textAlign(CENTER, CENTER);
+
+  textSize(28);
+  text(`You think you can escape, ${q.name}?`, width / 2, height / 2 - 60);
+
+  textSize(16);
+  text(`You're not as ${q.selfWord} as you think.`, width / 2, height / 2);
+
+  textSize(16);
+  text(`Watch out for ${q.fear} in ${q.city}.`, width / 2, height / 2 + 30);
+}
+
+// ===============================
+// MOVEMENT
+// ===============================
 function handleMovement() {
+  player.prevX = player.x;
+  player.prevY = player.y;
+
   player.vx = 0;
   player.vy = 0;
 
-  if (keyIsDown(87)) player.vy = -PLAYER_SPEED; // W
-  if (keyIsDown(83)) player.vy = PLAYER_SPEED;  // S
-  if (keyIsDown(65)) player.vx = -PLAYER_SPEED; // A
-  if (keyIsDown(68)) player.vx = PLAYER_SPEED;  // D
+  if (keyIsDown(87)) player.vy = -PLAYER_SPEED;
+  if (keyIsDown(83)) player.vy = PLAYER_SPEED;
+  if (keyIsDown(65)) player.vx = -PLAYER_SPEED;
+  if (keyIsDown(68)) player.vx = PLAYER_SPEED;
 
   player.x += player.vx;
   player.y += player.vy;
 
-  player.constrainToPlayableArea();
+  player.constrain();
 }
 
-// ---------- Check collision against walls ----------
+// ===============================
+// COLLISIONS
+// ===============================
 function resolveWallCollisions() {
-  for (const wall of walls) {
+  for (let wall of walls) {
     if (wall.blocks(player)) {
-      player.bumpOutOfWall(wall);
+      player.bumpBack();
     }
   }
 }
 
-// ---------- Update/draw hearts ----------
+// ===============================
+// HEARTS
+// ===============================
 function updateHearts() {
-  for (const heart of hearts) {
-    //heart.update();
+  for (let heart of hearts) {
     heart.display();
-    heart.checkCollision(player);
+    heart.check(player);
   }
 }
 
-// ---------- Update/draw barriers and handle barrier narrative ----------
-function updateBarriers(bass, treble) {
-  for (const barrier of barriers) {
-    barrier.reactToAudio(bass, treble);
+// ===============================
+// BARRIERS
+// ===============================
+function updateBarriers() {
+  for (let barrier of barriers) {
     barrier.display();
 
     if (!barrier.overlaps(player)) continue;
 
-    const colorName = barrier.allowedColor;
+    // Player does NOT match barrier color
+    if (player.color !== barrier.color) {
 
-    if (player.colorName == colorName) {
-      currentNarrative = "That works.";
-      spawnParticles(player.x + player.size / 2, player.y + player.size / 2, barrier.baseHue);
-    } else {
-      currentNarrative = `Not ${colorName} enough.`;
-      player.bumpBack();
-      spawnParticles(player.x + player.size / 2, player.y + player.size / 2, barrier.baseHue);
-    }
-  }
-}
+      // Stage 3: bumping blue barrier triggers bottom voice
+      if (currentStage === 3 && barrier.color === "Blue") {
+        bottomVoice = "VOICE: Take the blue heart.";
 
-// ---------- Draw walls ----------
-function drawWalls() {
-  for (const wall of walls) {
-    wall.display();
-  }
-}
-
-// ---------- Check whether player reached level exit ----------
-function checkEndZone() {
-  if (player.x + player.size <= width - END_ZONE_W) return;
-
-  if (currentLevel == 1) {
-    if (heartsCollected >= 1) {
-      setupLevel2();
-    } else {
-      currentNarrative = "Not yet.";
-      player.bumpBackHard();
-    }
-    return;
-  }
-  
-  if (currentLevel == 2) {
-    if (heartsCollected >= 3) {
-      setupLevel3();
-    } else {
-      currentNarrative = "Not yet.";
-      player.bumpBackHard();
-    }
-    return;
-  }
-
-  if (currentLevel == 3) {
-    if (heartsCollected >= 6) {
-      setupLevel4();
-    } else {
-      currentNarrative = "You still have more to learn.";
-      player.bumpBackHard();
-    }
-    return;
-  }
-
-  if (currentLevel == 4) {
-    if (heartsCollected >= TOTAL_HEARTS_GOAL) {
-      gameState = "win";
-      currentNarrative = "You are no longer one color.";
-      if (song && song.isPlaying()) {
-        song.stop();
+        if (hearts.length > 0) {
+          hearts[0].visible = true;
+        }
       }
-    } else {
-      currentNarrative = "One last heart.";
-      player.bumpBackHard();
+
+      // Stage 2: blue barrier rejection stays cult/top narration
+      else if (currentStage === 2 && barrier.color === "Blue") {
+        currentNarrative = "RED ORDER: Don't be dumb.";
+      }
+
+      // Red barrier rejection
+      else {
+        currentNarrative = "RED ORDER: Not red enough.";
+
+        if (hearts.length > 0) {
+          hearts[0].visible = true;
+        }
+      }
+
+      player.bumpBack();
     }
+
+    // Player DOES match barrier color
+    else {
+
+      // Stage 1: passing red barrier triggers stage-specific bottom voice
+      if (currentStage === 1 && barrier.color === "Red") {
+        bottomVoice = "VOICE: Don't trust them.";
+      }
+
+      // Stage 2: passing red barrier triggers different bottom voice
+      else if (currentStage === 2 && barrier.color === "Red") {
+        bottomVoice = "VOICE: Turn back while you still can.";
+      }
+
+      // Stage 3: passing blue barrier
+      else if (currentStage === 3 && barrier.color === "Blue") {
+        currentNarrative = "RED ORDER: Return. Return. Return.";
+        bottomVoice = "VOICE: Get out of here!";
+      }
+
+      // fallback
+      else {
+        currentNarrative = "Passage allowed.";
+      }
+    }
+  }
+}
+
+// ===============================
+// END ZONE
+// ===============================
+function drawEndZone() {
+  fill(0, 80, 100, 45);
+  rect(width - END_ZONE_W, 0, END_ZONE_W, height);
+}
+
+function checkEndZone() {
+  if (player.x + player.size < width - END_ZONE_W) return;
+
+  // Stage 1
+  if (gameState === "play" && barriers.length === 1 && !stage3TrapTriggered) {
+    if (heartsCollected >= 1) {
+      gameState = "stageComplete1";
+
+      if (song && song.isPlaying()) {
+        song.pause();
+      }
+    }
+    return;
+  }
+
+  // Stage 2
+  if (gameState === "play" && barriers.length === 2 && !stage3TrapTriggered) {
+    if (heartsCollected >= 1 && player.color === "Red") {
+      gameState = "stageComplete2";
+
+      if (song && song.isPlaying()) {
+        song.pause();
+      }
+    }
+
+    return;
+  }
+
+  // Stage 3 final escape
+  if (gameState === "play" && stage3TrapTriggered) {
+    if (player.color === "Blue") {
+      gameState = "finalComplete";
+
+      if (song && song.isPlaying()) {
+        song.pause();
+      }
+    }
+
     return;
   }
 }
 
-// ---------- Keyboard events ----------
+// ===============================
+// UI
+// ===============================
+function drawNarration() {
+  fill(0, 150);
+  rect(0, 0, width, 100);
+
+  fill(0, 80, 100);
+  textAlign(LEFT, TOP);
+  textSize(16);
+  text(currentNarrative, 20, 20);
+}
+
+function drawBottomVoice() {
+  if (bottomVoice === "") return;
+
+  fill(0, 0, 0, 160);
+  rect(0, height - 35, width, 35);
+
+  fill(220, 80, 100);
+  textAlign(LEFT, CENTER);
+  textSize(13);
+
+  text(bottomVoice, 12, height - 18);
+}
+
+// ===============================
+// INPUT
+// ===============================
 function keyPressed() {
-  if (gameState === "intro" && (keyCode === ENTER || key === " ")) {
+  if (gameState === "intro" && keyCode === ENTER) {
     gameState = "play";
-    
-    if (song && !song.isPlaying()) {
+
+    if (song && song.isLoaded() && !song.isPlaying()) {
       song.loop();
     }
-    return;
+
+    return false;
   }
 
-  if (gameState === "win" && (keyCode === ENTER || key === " ")) {
+  if (gameState === "stageComplete1" && keyCode === ENTER) {
     gameState = "play";
-    setupLevel1();
+    setupStage2();
 
-    if (song && !song.isPlaying()) {
+    if (song && song.isLoaded() && !song.isPlaying()) {
       song.loop();
     }
-    return;
+
+    return false;
   }
 
-  if (key === '2') {
-    setupLevel2();
-    return;
-  }
-  if (key === '3') {
-    setupLevel3();
-    return;
-  }
-  if (key === '4') {
-    setupLevel4();
-    return;
+  if (gameState === "stageComplete2" && keyCode === ENTER) {
+    gameState = "play";
+    setupStage3();
+
+    if (song && song.isLoaded() && !song.isPlaying()) {
+      song.loop();
+    }
+
+    return false;
   }
 }
 
-// ---------- Convert a color name into an HSB hue ----------
-function getHueFromColor(colorName) {
-  const hueMap = {
-    Red: 0,
-    Orange: 30,
-    Yellow: 55,
-    Green: 120,
-    Blue: 220,
-    Indigo: 260,
-    Violet: 290,
-    Purple: 280
-  };
-
-  return hueMap[colorName];
+function getColorHue(color) {
+  if (color === "Red") return 0;
+  if (color === "Blue") return 220;
+  if (color === "White") return 0;
+  return 0;
 }
 
-// ---------- Simple AABB collision ----------
-function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
-  return (
-    ax + aw > bx &&
-    ax < bx + bw &&
-    ay + ah > by &&
-    ay < by + bh
-  );
-}
-
-// ---------- Center point of the player square ----------
-function getPlayerCenter(playerObj) {
-  return {
-    x: playerObj.x + playerObj.size / 2,
-    y: playerObj.y + playerObj.size / 2
-  };
-}
-
-// =====================================================
-// PLAYER CLASS
-// Handles player appearance, movement response, and bumping
-// =====================================================
-
+// ===============================
+// PLAYER
+// ===============================
 class Player {
   constructor(x, y) {
-    // Position
     this.x = x;
     this.y = y;
-
-    // Velocity from input
-    this.vx = 0;
-    this.vy = 0;
-
-    // Appearance
+    this.prevX = x;
+    this.prevY = y;
     this.size = 30;
-    this.colorName = "Red";
-    this.hue = getHueFromColor("Red");
+    this.color = "White";
   }
 
-  // ---------- Change the player's active color ----------
-  setColor(name, hue = getHueFromColor(name)) {
-    this.colorName = name;
-    this.hue = hue;
-  }
-
-  // ---------- Draw the player ----------
   display() {
-    let level = 0;
-
-    if (typeof amp !== "undefined") {
-      level = amp.getLevel();
+    if (this.color === "White") {
+      fill(0, 0, 100);
+    } else {
+      fill(getColorHue(this.color), 90, 80);
     }
 
-    fill(this.hue, 90, 80);
     rect(this.x, this.y, this.size, this.size, 6);
   }
 
-  // ---------- Small bump opposite current movement ----------
   bumpBack() {
-    this.applyBump(10);
-  }
-
-  // ---------- Stronger bump opposite current movement ----------
-  bumpBackHard() {
-    this.applyBump(15);
-  }
-
-  // ---------- Shared bump logic ----------
-  applyBump(pushStrength) {
-    this.x -= this.vx * pushStrength;
-    this.y -= this.vy * pushStrength;
-
-    this.constrainToPlayableArea();
+    this.x = this.prevX;
+    this.y = this.prevY;
+    this.constrain();
 
     osc.freq(100);
-    env.play();
+    env.play(osc);
   }
 
-  // ---------- Keep player inside legal bounds ----------
-  constrainToPlayableArea() {
+  constrain() {
     this.x = constrain(this.x, 0, width - this.size);
-    this.y = constrain(this.y, 150, height - this.size);
-  }
-
-  // ---------- Push the player out of a wall based on smallest overlap ----------
-  bumpOutOfWall(wall) {
-    const playerLeft = this.x;
-    const playerRight = this.x + this.size;
-    const playerTop = this.y;
-    const playerBottom = this.y + this.size;
-
-    const wallLeft = wall.x;
-    const wallRight = wall.x + wall.w;
-    const wallTop = wall.y;
-    const wallBottom = wall.y + wall.h;
-
-    const overlapLeft = playerRight - wallLeft;
-    const overlapRight = wallRight - playerLeft;
-    const overlapTop = playerBottom - wallTop;
-    const overlapBottom = wallBottom - playerTop;
-
-    const minOverlap = min(overlapLeft, overlapRight, overlapTop, overlapBottom);
-
-    if (minOverlap === overlapLeft) {
-      this.x = wallLeft - this.size;
-    } else if (minOverlap === overlapRight) {
-      this.x = wallRight;
-    } else if (minOverlap === overlapTop) {
-      this.y = wallTop - this.size;
-    } else if (minOverlap === overlapBottom) {
-      this.y = wallBottom;
-    }
-
-    this.constrainToPlayableArea();
+    this.y = constrain(this.y, 120, height - this.size);
   }
 }
 
-// =====================================================
-// HEART CLASS
-// =====================================================
-
+// ===============================
+// HEART
+// ===============================
 class Heart {
-  constructor(x, y, colorName) {
+  constructor(x, y, color) {
     this.x = x;
     this.y = y;
-    this.size = 22;
-
-    this.colorName = colorName;
-    this.hue = getHueFromColor(colorName);
-
+    this.size = 20;
+    this.color = color;
     this.collected = false;
     this.visible = true;
   }
 
-  // ---------- Draw heart shape ----------
   display() {
     if (this.collected || !this.visible) return;
 
     push();
     translate(this.x, this.y);
     noStroke();
-    fill(this.hue, 80, 100);
+    fill(getColorHue(this.color), 80, 100);
 
     beginShape();
     vertex(0, this.size * 0.3);
@@ -425,81 +689,74 @@ class Heart {
     pop();
   }
 
-  // ---------- Handle player interaction ----------
-  checkCollision(playerObj) {
-    if (this.collected || !this.visible) return;
+check(player) {
+  if (this.collected || !this.visible) return;
 
-    const playerCenter = getPlayerCenter(playerObj);
-    const d = dist(playerCenter.x, playerCenter.y, this.x, this.y);
+  const playerCenterX = player.x + player.size / 2;
+  const playerCenterY = player.y + player.size / 2;
 
-    if (d >= this.size) return;
+  const d = dist(playerCenterX, playerCenterY, this.x, this.y);
 
-    if (d < this.size) {
-      this.collected = true;
-      heartsCollected++;
-      unlockedColors.push(this.colorName);
-      spawnParticles(this.x, this.y, this.hue);
-      currentNarrative = `You learned ${this.colorName}.`
+  if (d < this.size + player.size / 2) {
+
+    if (!stage3TrapTriggered && barriers.length === 2 && this.color === "Blue") {
+      currentNarrative = "RED ORDER: Don't be dumb.";
+      spawnParticles(this.x, this.y, getColorHue("Blue"));
+
+      osc.freq(120);
+      env.play(osc);
+
+      player.bumpBack();
+      return;
     }
+
+    this.collected = true;
+    heartsCollected++;
+
+    player.color = this.color;
+
+    if (this.color === "Red") {
+      currentNarrative = "RED ORDER: You have accepted red into your heart.";
+    }
+
+    spawnParticles(this.x, this.y, getColorHue(this.color));
+
+    osc.freq(300);
+    env.play(osc);
   }
 }
+}
 
-// =====================================================
-// BARRIER CLASS
-// =====================================================
-
+// ===============================
+// BARRIER
+// ===============================
 class Barrier {
-  constructor(x, y, w, h, allowedColor) {
+  constructor(x, y, w, h, color) {
     this.x = x;
     this.y = y;
     this.w = w;
     this.h = h;
-
-    this.allowedColor = allowedColor;
-
-    this.baseHue = getHueFromColor(allowedColor);
-    this.hue = this.baseHue;
-    this.baseHeight = h;
+    this.color = color;
   }
 
-  // ---------- React visually to FFT values ----------
-  reactToAudio(bass, treble) {
-    this.hue = (this.baseHue + map(treble, 0, 255, -8, 8) + 360) % 360;
-    this.h = this.baseHeight + map(bass, 0, 255, -18, 18);
-  }
-
-  // ---------- Draw barrier ----------
   display() {
-    fill(this.hue, 70, 100, 70);
+    fill(getColorHue(this.color), 70, 100, 70);
     rect(this.x, this.y, this.w, this.h, 4);
   }
 
-  // ---------- Does this barrier physically block the player? ----------
-  blocks(playerObj) {
-    const hit = rectsOverlap(
-      playerObj.x, playerObj.y, playerObj.size, playerObj.size,
-      this.x, this.y, this.w, this.h
-    );
-
-    if (!hit) return false;
-
-    return playerObj.colorName !== this.allowedColor;
-  }
-
-  // ---------- Does the player overlap this barrier at all? ----------
-  overlaps(playerObj) {
-    return rectsOverlap(
-      playerObj.x, playerObj.y, playerObj.size, playerObj.size,
-      this.x, this.y, this.w, this.h
+  overlaps(player) {
+    return (
+      player.x < this.x + this.w &&
+      player.x + player.size > this.x &&
+      player.y < this.y + this.h &&
+      player.y + player.size > this.y
     );
   }
 }
 
-// =====================================================
-// WALL CLASS
-// Static rectangular obstacles
-// =====================================================
-
+// ===============================
+// WALL
+// ===============================
 class Wall {
   constructor(x, y, w, h) {
     this.x = x;
@@ -508,248 +765,19 @@ class Wall {
     this.h = h;
   }
 
-  // ---------- Draw wall ----------
   display() {
     fill(0, 0, 85);
     rect(this.x, this.y, this.w, this.h, 4);
   }
 
-  // ---------- Check whether wall overlaps the player ----------
-  blocks(playerObj) {
-    return rectsOverlap(
-      playerObj.x, playerObj.y, playerObj.size, playerObj.size,
-      this.x, this.y, this.w, this.h
+  blocks(player) {
+    return (
+      player.x < this.x + this.w &&
+      player.x + player.size > this.x &&
+      player.y < this.y + this.h &&
+      player.y + player.size > this.y
     );
   }
 }
 
-// =====================================================
-// VISUAL EFFECTS + UI
-// Particle effects, atmosphere, intro, and HUD
-// =====================================================
-
-// ---------- Spawn small particles for feedback ----------
-function spawnParticles(x, y, hue) {
-  for (let i = 0; i < 6; i++) {
-    particles.push({
-      x: x,
-      y: y,
-      vx: random(-2, 2),
-      vy: random(-2, 2),
-      life: 30,
-      hue: hue
-    });
-  }
-}
-
-// ---------- Update and draw particles ----------
-function updateParticles() {
-  for (let i = particles.length - 1; i >= 0; i--) {
-    const p = particles[i];
-
-    p.x += p.vx;
-    p.y += p.vy;
-    p.life--;
-
-    fill(p.hue, 80, 100, map(p.life, 0, 30, 0, 100));
-    ellipse(p.x, p.y, 8);
-
-    if (p.life <= 0) {
-      particles.splice(i, 1);
-    }
-  }
-}
-
-// ---------- Intro screen ----------
-function drawIntroScreen() {
-  background(230, 30, 12);
-
-  fill(0, 0, 100);
-  textAlign(CENTER, CENTER);
-
-  textSize(38);
-  text("CODE RED", width / 2, height / 2 - 100);
-
-  textSize(16);
-  text("Controls", width / 2, height / 2 - 10);
-  text("W A S D = move", width / 2, height / 2 + 25);
-
-  textSize(14);
-  text("Press ENTER or SPACE to begin.", width / 2, height / 2 + 165);
-}
-
-// ---------- Background + narration panel + end zone ----------
-function drawAtmosphere(bass, treble) {
-  noStroke();
-
-  // Soft pulsing ellipses in background
-  for (let i = 0; i < 4; i++) {
-    fill(bgHue, 25, 35, 8);
-    ellipse(width * 0.5, height * 0.5);
-  }
-
-  // Narration area
-  fill(0, 0, 0, 20);
-  rect(0, 0, width - 60, 110);
-
-  fill(0, 0, 100);
-  textAlign(LEFT, TOP);
-  textSize(18);
-  text(currentNarrative, 24, 24);
-}
-
-// ---------- Bottom HUD ----------
-function drawBottomUI() {
-  fill(0, 0, 0, 25);
-  rect(0, height - 60, 150, 80);
-
-  fill(0, 0, 100);
-  textAlign(LEFT, CENTER);
-  textSize(18);
-  text(`Stage: ${currentLevel}`, 20, height - 40);
-  text(`Hearts: ${heartsCollected}/${TOTAL_HEARTS_GOAL}`, 20, height - 20);
-}
-
-function drawEndZone() {
-  noStroke();
-  fill(120, 60, 100, 50);
-  rect(width - END_ZONE_W, 0, END_ZONE_W, height);
-}
-
-function drawWinScreen() {
-  background(280, 20, 12);
-
-  fill(0, 0, 100);
-  textAlign(CENTER, CENTER);
-
-  textSize(36);
-  text("Complete", width / 2, height / 2 - 80);
-
-  textSize(18);
-  text("What are your true colors?", width / 2, height / 2 - 15);
-  text(`Hearts collected: ${heartsCollected}/${TOTAL_HEARTS_GOAL}`, width / 2, height / 2 + 20);
-
-  textSize(14);
-  text("Press ENTER or SPACE to restart.", width / 2, height / 2 + 90);
-}
-
-// =====================================================
-// LEVEL SETUP
-// Builds the objects for each level
-// =====================================================
-
-function setupLevel1() {
-  currentLevel = 1;
-  heartsCollected = 0;
-  
-  player = new Player(80, 450);
-
-  barriers = [
-    new Barrier(width / 2, 170, 40, 350, "Red"),
-  ];
-  
-  hearts = [
-    new Heart(100, height / 2, "Red")
-  ];
-  hearts[0].visible = false;
-
-  walls = [
-    new Wall(0, 150, width, 20),
-    new Wall(0, height - 150, width, 20)
-  ];
-
-  particles = [];
-}
-
-function setupLevel2() {
-  currentLevel = 2;
-  heartsCollected = 1;
-  currentNarrative = "That color won't work here."
-  player = new Player(80, 450);
-
-  barriers = [];
-  barriers.push(new Barrier(width / 2, 340, 40, 180, "Blue"));
-  barriers.push(new Barrier(300, 170, 40, 180, "Yellow"));
-  barriers.push(new Barrier(300, 340, 40, 180, "Red"));
-  barriers.push(new Barrier(width / 2, 170, 40, 180, "Red"));
-  barriers.push(new Barrier(700, 170, 40, 180, "Yellow"));
-  
-  hearts = [];
-  hearts.push(new Heart(830, (height / 2) - 100, "Blue"));
-  hearts.push(new Heart(430, (height / 2) + 150, "Yellow"));
-  
-  walls = [];
-  walls.push(new Wall(0, 150, width, 20));
-  walls.push(new Wall(0, height - 150, width, 20));
-  walls.push(new Wall(150, height / 2, width, 20));
-  walls.push(new Wall(width - 80, 160, 20, 170))
-
-  unlockedColors = ["Red"];
-  
-  particles = [];
-}
-
-function setupLevel3() {
-  currentLevel = 3;
-  heartsCollected = 3;
-  currentNarrative = "Now what?"
-  
-  player = new Player(80, 450);
-  
-  barriers = [];
-
-  // Early barriers using already-known colors
-  barriers.push(new Barrier(250, 340, 40, 180, "Red"));
-  barriers.push(new Barrier(250, 170, 40, 180, "Blue"));
-
-  barriers.push(new Barrier(100, 170, 40, 180, "Indigo"));
-  
-  // Mid barriers guiding player toward new hearts
-  barriers.push(new Barrier(300, height /2, 180, 38, "Orange"));
-  barriers.push(new Barrier(500, 170, 40, 360, "Green"));
-
-  // Final FFT-driven barrier
-  barriers.push(new Barrier(760, 170, 40, 360, "Orange"));
-
-  hearts = [];
-  hearts.push(new Heart(380, 430, "Orange"));
-  hearts.push(new Heart(380, 240, "Indigo"));
-  hearts.push(new Heart(40, 240, "Green"));
-
-  walls = [];
-  walls.push(new Wall(0, 150, width, 20));
-  walls.push(new Wall(0, height - 150, width, 20));
-  walls.push(new Wall(0, height / 2, 360, 20));
-  walls.push(new Wall(440, height / 2, 100, 20)); 
-  
-  unlockedColors = ["Red", "Yellow", "Blue"];
-  
-  particles = [];
-}
-
-function setupLevel4() {
-  currentLevel = 4;
-  heartsCollected = 6;
-  currentNarrative = "One more color.";
-
-  player = new Player(80, 450);
-
-  barriers = [];
-  barriers.push(new Barrier(180, 170, 28, 360, "Red"));
-  barriers.push(new Barrier(300, 170, 28, 360, "Yellow"));
-  barriers.push(new Barrier(420, 170, 28, 360, "Blue"));
-  barriers.push(new Barrier(540, 170, 28, 360, "Orange"));
-  barriers.push(new Barrier(660, 170, 28, 360, "Green"));
-  barriers.push(new Barrier(780, 170, 28, 360, "Indigo"));
-
-  hearts = [];
-  hearts.push(new Heart(900, 345, "Violet"));
-
-  walls = [];
-  walls.push(new Wall(0, 150, width, 20));
-  walls.push(new Wall(0, height - 150, width, 20));
-
-  unlockedColors = ["Red", "Yellow", "Blue", "Orange", "Green", "Indigo"];
-
-  particles = [];
-}
+window.startRedTrial = startRedTrial;
